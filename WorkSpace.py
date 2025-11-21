@@ -226,9 +226,41 @@ class DirTreeCommand():
         print_tree(tree)
 
 class UndoCommand():
-    def execute(self, args):
-        pass
+    def execute(self, command):
+        if len(command.split()) != 1:
+            print("参数错误，应为：undo")
+            return
+        
+        # 检查是否有活动文件
+        if not WorkSpace.current_workFile_path:
+            print("没有打开的文件")
+            return
+        
+        # 获取当前文件
+        current_file = WorkSpace.current_workFile_list.get(WorkSpace.current_workFile_path)
+        if not current_file:
+            print("当前文件不存在")
+            return
+        
+        # 执行撤销
+        current_file.undo()
 
 class RedoCommand():
-    def execute(self, args):
-        pass   
+    def execute(self, command):
+        if len(command.split()) != 1:
+            print("参数错误，应为：redo")
+            return
+        
+        # 检查是否有活动文件
+        if not WorkSpace.current_workFile_path:
+            print("没有打开的文件")
+            return
+        
+        # 获取当前文件
+        current_file = WorkSpace.current_workFile_list.get(WorkSpace.current_workFile_path)
+        if not current_file:
+            print("当前文件不存在")
+            return
+        
+        # 执行重做
+        current_file.redo()

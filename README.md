@@ -79,9 +79,17 @@ python Run.py
 ├── EditorActions.py          # 文本编辑命令实现
 ├── CommonUtils.py            # 通用工具函数
 ├── Memento.py                # 状态持久化
-├── test_editor_actions.py   # 单元测试
-├── .github/workflows/        # CI/CD配置
-└── 测试说明.md               # 测试文档
+│
+├── tests/                    # 测试目录
+│   └── test_editor_actions.py
+│
+├── docs/                     # 文档目录
+│   ├── 测试说明.md
+│   ├── 设计模式_lab1.md
+│   └── 设计模式Lab说明.md
+│
+└── .github/workflows/        # CI/CD配置
+    └── test.yml
 ```
 
 ## 开发
@@ -90,10 +98,13 @@ python Run.py
 
 ```bash
 # 运行所有测试
-python test_editor_actions.py
+python -m unittest discover -s tests
 
 # 详细输出
-python -m unittest test_editor_actions -v
+python -m unittest discover -s tests -v
+
+# 运行特定测试文件
+python -m unittest tests.test_editor_actions
 ```
 
 ## 持续集成
@@ -103,10 +114,11 @@ python -m unittest test_editor_actions -v
 - ✅ 支持Python 3.8-3.11多版本
 - ✅ Push和PR时自动触发
 
-详见：[测试说明.md](测试说明.md)
+详见：[测试说明.md](docs/测试说明.md)
 
 
 ## 设计文档
 
-详细的整体功能需求和设计说明请参考：[设计模式Lab说明](设计模式Lab说明.md)
-- Lab1设计模式说明：[设计模式_lab1](设计模式_lab1.md)
+详细的整体功能需求和设计说明请参考：
+- [设计模式Lab说明](docs/设计模式Lab说明.md)
+- [Lab1设计模式说明](docs/设计模式_lab1.md)

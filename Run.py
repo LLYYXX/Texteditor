@@ -1,5 +1,6 @@
 import WorkSpace
 import Memento
+import EditorActions
 
 class CommandFactory:
     def __init__(self):
@@ -15,12 +16,12 @@ class CommandFactory:
             "undo": WorkSpace.UndoCommand(),
             "redo": WorkSpace.RedoCommand(),
 
-            # # 文件命令
-            # "append": AppendCommand(),
-            # "insert": InsertCommand(),
-            # "delete": DeleteCommand(),
-            # "replace": ReplaceCommand(),
-            # "show": ShowCommand(),
+            # 文本编辑命令
+            "append": EditorActions.AppendCommand(),
+            "insert": EditorActions.InsertCommand(),
+            "delete": EditorActions.DeleteCommand(),
+            "replace": EditorActions.ReplaceCommand(),
+            "show": EditorActions.ShowCommand(),
 
             # # 日志命令
             # "log-on": LogOnCommand(),
