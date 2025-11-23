@@ -1,6 +1,7 @@
 import WorkSpace
 import Memento
 import EditorActions
+import Logging
 
 class CommandFactory:
     def __init__(self):
@@ -24,9 +25,9 @@ class CommandFactory:
             "show": EditorActions.ShowCommand(),
 
             # # 日志命令
-            # "log-on": LogOnCommand(),
-            # "log-off": LogOffCommand(),
-            # "log-show": LogShowCommand(),
+            "log-on": Logging.LogOnCommand(),
+            "log-off": Logging.LogOffCommand(),
+            "log-show": Logging.LogShowCommand(),
         }
 
     def isValid(self, operator):

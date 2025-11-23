@@ -3,7 +3,7 @@
 使用命令模式（Command Pattern）实现可撤销的编辑操作
 """
 import WorkSpace
-
+import Logging
 
 class EditCommand:
     """编辑命令基类（抽象命令）"""
@@ -54,6 +54,10 @@ class AppendCommand(EditCommand):
         self.file.content.append(self.text)
         self.file.state = "modified"
         print("追加成功")
+        print("self.file:", self.file)
+        print("self.file.filePath:", self.file.filePath)
+        print("self.text:", self.text)
+        WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"append \"{self.text}\"")
         
         # 添加到命令历史（用于undo/redo）
         self.file.add_to_history(self)
@@ -64,12 +68,14 @@ class AppendCommand(EditCommand):
         if self.file and self.file.content:
             self.file.content.pop()
             print("撤销追加操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"undo append \"{self.text}\"")
     
     def redo(self):
         """重做追加操作"""
         if self.file:
             self.file.content.append(self.text)
             print("重做追加操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"redo append \"{self.text}\"")
         
 
 class InsertCommand(EditCommand):
@@ -170,6 +176,7 @@ class InsertCommand(EditCommand):
         
         self.file.state = "modified"
         print("插入成功")
+        WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"insert {self.line}:{self.col} \"{self.text}\"")
         self.file.add_to_history(self)
         return True
     
@@ -199,6 +206,7 @@ class InsertCommand(EditCommand):
                         # 如果原始行内容为空，删除该行
                         self.file.content.pop(line_idx)
             print("撤销插入操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"undo insert {self.line}:{self.col} \"{self.text}\"")
     
     def redo(self):
         """重做插入操作"""
@@ -228,6 +236,7 @@ class InsertCommand(EditCommand):
                 self.file.content[line_idx] = new_line
             
             print("重做插入操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"redo insert {self.line}:{self.col} \"{self.text}\"")
 
 
 class DeleteCommand(EditCommand):
@@ -302,6 +311,7 @@ class DeleteCommand(EditCommand):
         
         self.file.state = "modified"
         print("删除成功")
+        WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"delete {self.line}:{self.col} {self.length}")
         self.file.add_to_history(self)
         return True
     
@@ -312,6 +322,7 @@ class DeleteCommand(EditCommand):
             if line_idx < len(self.file.content):
                 self.file.content[line_idx] = self.original_line_content
             print("撤销删除操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"undo delete {self.line}:{self.col} {self.length}")
     
     def redo(self):
         """重做删除操作"""
@@ -322,6 +333,7 @@ class DeleteCommand(EditCommand):
             new_line = current_line[:col_idx] + current_line[col_idx + self.length:]
             self.file.content[line_idx] = new_line
             print("重做删除操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"redo delete {self.line}:{self.col} {self.length}")
 
 
 class ReplaceCommand(EditCommand):
@@ -402,6 +414,7 @@ class ReplaceCommand(EditCommand):
         self.file.state = "modified"
         print("替换成功")
         self.file.add_to_history(self)
+        WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"replace {self.line}:{self.col} {self.length} \"{self.text}\"")
         return True
     
     def undo(self):
@@ -411,6 +424,7 @@ class ReplaceCommand(EditCommand):
             if line_idx < len(self.file.content):
                 self.file.content[line_idx] = self.original_line_content
             print("撤销替换操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"undo replace {self.line}:{self.col} {self.length} \"{self.text}\"")
     
     def redo(self):
         """重做替换操作"""
@@ -421,6 +435,7 @@ class ReplaceCommand(EditCommand):
             new_line = current_line[:col_idx] + self.text + current_line[col_idx + self.length:]
             self.file.content[line_idx] = new_line
             print("重做替换操作成功")
+            WorkSpace.WorkSpace.logger.log_command(self.file.filePath, f"redo replace {self.line}:{self.col} {self.length} \"{self.text}\"")
 
 
 class ShowCommand(EditCommand):
@@ -479,6 +494,7 @@ class ShowCommand(EditCommand):
         for i in range(start_line - 1, actual_end):
             print(f"{i + 1}: {file.content[i]}")
         
+        WorkSpace.WorkSpace.logger.log_command(file, f"show {start_line}:{end_line}")
         return False  # show命令不进入历史栈
     
     def can_undo(self):

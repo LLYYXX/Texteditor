@@ -2,7 +2,7 @@ import File
 import CommonUtils
 from datetime import datetime
 import Memento
-
+import Logging
 
 class WorkSpace():
     current_workFile_path = ""
@@ -10,6 +10,9 @@ class WorkSpace():
     logOpen = False
     #这个用于lru
     recent_files = []
+    
+    # 集成 Logger 日志记录实例
+    logger = Logging.Logger() 
     
     @classmethod
     #只有在 load close 时才会更新
@@ -81,6 +84,7 @@ class LoadCommand():
         if filePath in WorkSpace.recent_files:
             WorkSpace.recent_files.remove(filePath)
         WorkSpace.recent_files.append(filePath)
+        WorkSpace.logger.log_command(filePath, f"load {filePath}")
 
 
 #等操作栈的实现完成之后再实现
@@ -89,6 +93,8 @@ class SaveCommand():
         args = command.split(" ")
         if(len(args)==1):
             filePath = WorkSpace.current_workFile_path
+            # 那我先写上了
+            WorkSpace.logger.log_command(filePath, f"save {filePath}")
         
                
 
@@ -121,6 +127,11 @@ class InitCommand():
             WorkSpace.recent_files.remove(filePath)
         WorkSpace.recent_files.append(filePath)
         print("初始化文件成功")
+        if withLog:
+            WorkSpace.logger.enable_logging(filePath)
+            WorkSpace.logger.log_command(filePath, f"init {filePath} with-log")
+        else:
+            WorkSpace.logger.log_command(filePath, f"init {filePath}")
 
 class CloseCommand():
     def execute(self, command):
@@ -163,6 +174,7 @@ class CloseCommand():
                 WorkSpace.update_current_workFile_path("")
         WorkSpace.update_current_workFile_list()
         print("关闭文件成功")
+        WorkSpace.logger.log_command(filePath, f"close {filePath}")
 
 
 class EditCommand():
@@ -184,6 +196,7 @@ class EditCommand():
             WorkSpace.recent_files.remove(filePath)
         WorkSpace.recent_files.append(filePath)
         print(f"切换到文件{filePath}成功")
+        WorkSpace.logger.log_command(filePath, f"edit {filePath}")
 
 class EditorListCommand():
     def execute(self, command):
@@ -191,6 +204,7 @@ class EditorListCommand():
             print("参数错误，应为：editor-list")
         for f in WorkSpace.current_workFile_list.values():
             print(f.filePath)
+
 class DirTreeCommand():
     def execute(self, command):
         if len(command.split(" ")) != 1:
@@ -244,6 +258,7 @@ class UndoCommand():
         
         # 执行撤销
         current_file.undo()
+        WorkSpace.logger.log_command(current_file, f"undo {current_file}")
 
 class RedoCommand():
     def execute(self, command):
@@ -264,3 +279,4 @@ class RedoCommand():
         
         # 执行重做
         current_file.redo()
+        WorkSpace.logger.log_command(current_file, f"redo {current_file}")
