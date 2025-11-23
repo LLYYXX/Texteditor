@@ -86,15 +86,76 @@ class LoadCommand():
         WorkSpace.recent_files.append(filePath)
         WorkSpace.logger.log_command(filePath, f"load {filePath}")
 
-
-#等操作栈的实现完成之后再实现
+     
 class SaveCommand():
     def execute(self, command):
         args = command.split(" ")
-        if(len(args)==1):
+        if len(args) == 1:
+            # save 当前文件
             filePath = WorkSpace.current_workFile_path
-            # 那我先写上了
-            WorkSpace.logger.log_command(filePath, f"save {filePath}")
+            self.save_single_file(filePath)
+        elif len(args) == 2:
+            param = args[1]
+            if param == "all":
+                # save 所有文件
+                self.save_all_files()
+            else:
+                # save 指定文件
+                filePath = param
+                if not CommonUtils.pathCheck(filePath):
+                    print("参数错误")
+                    return
+                if filePath not in [f.filePath for f in WorkSpace.current_workFile_list.values()]:
+                    print("该文件不在当前工作区中")
+                    return
+                self.save_single_file(filePath)
+                WorkSpace.logger.log_command(filePath, f"save {filePath}")
+        else:
+            print("参数错误，应为：save [file|all]")
+            return
+
+    def save_single_file(self, file_path):
+        """保存单个文件"""
+        # 检查是否有活动文件
+        if not WorkSpace.current_workFile_path:
+            print("没有打开的文件")
+            return
+
+        # 获取要保存的文件
+        file_to_save = WorkSpace.current_workFile_list.get(file_path)
+        if not file_to_save:
+            print("文件不存在")
+            return
+
+        # 写入文件
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                for line in file_to_save.content:
+                    f.write(line + '\n')
+            # 更新文件状态
+            file_to_save.state = "normal"
+            print(f"保存文件 {file_path} 成功")
+        except Exception as e:
+            print(f"保存文件失败: {e}")
+
+    def save_all_files(self):
+        """保存所有已打开的文件"""
+        if not WorkSpace.current_workFile_list:
+            print("没有打开的文件")
+            return
+            
+        for file_path, file_obj in WorkSpace.current_workFile_list.items():
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    for line in file_obj.content:
+                        f.write(line + '\n')
+                # 更新文件状态
+                file_obj.state = "normal"
+                print(f"保存文件 {file_path} 成功")
+            except Exception as e:
+                print(f"保存文件 {file_path} 失败: {e}")
+        
+        print("所有文件保存完成")
         
                
 
