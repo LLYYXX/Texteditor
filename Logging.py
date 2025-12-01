@@ -1,7 +1,8 @@
 import os
 import datetime
 import File
-import WorkSpace
+# Lab2修改: 移除顶层导入避免循环依赖
+# import WorkSpace
 
 class Logger:
     """
@@ -13,36 +14,76 @@ class Logger:
         self._enabled_files = set()
         # 记录本次会话是否已经为某个文件写入过 Session Header，防止重复写入
         self._session_started = set()
+        # Lab2新增: 存储每个文件的排除命令列表
+        self._excluded_commands = {}
 
     def enable_logging(self, filepath):
         """
         为指定文件启用日志
+        Lab2增强: 解析日志配置
         """
         if filepath not in self._enabled_files:
             self._enabled_files.add(filepath)
             self._write_session_start(filepath)
+            # Lab2新增: 解析文件首行的日志配置
+            self._parse_log_config(filepath)
             print(f"日志已启用: {self._get_log_filename(filepath)}")
 
     def disable_logging(self, filepath):
         """
         为指定文件关闭日志
+        Lab2增强: 清除过滤配置
         """
         if filepath in self._enabled_files:
             self._enabled_files.remove(filepath)
+            # Lab2新增: 清除排除命令配置
+            if filepath in self._excluded_commands:
+                del self._excluded_commands[filepath]
             print(f"日志已关闭: {filepath}")
 
     def is_logging_enabled(self, filepath):
         """检查文件是否开启了日志"""
         return filepath in self._enabled_files
 
+    # Lab2新增: 解析日志配置方法
+    def _parse_log_config(self, filepath):
+        """解析文件首行的日志配置，支持 # log -e <cmd> 语法"""
+        try:
+            if filepath in File.FileList.all_files:
+                file_obj = File.FileList.all_files[filepath]
+                first_line = ""
+                if hasattr(file_obj, 'content') and file_obj.content:
+                    first_line = file_obj.content[0].strip()
+                elif hasattr(file_obj, 'serialize'):
+                    lines = file_obj.serialize()
+                    first_line = lines[0].strip() if lines else ""
+                else:
+                    return
+                if first_line.startswith('# log'):
+                    import re
+                    pattern = r'-e\s+(\S+)'
+                    matches = re.findall(pattern, first_line)
+                    if matches:
+                        self._excluded_commands[filepath] = set(matches)
+                        print(f"[Info] 文件 {filepath} 将排除以下命令的日志: {', '.join(matches)}")
+        except Exception as e:
+            print(f"[Warning] 解析日志配置失败: {str(e)}")
+
     def log_command(self, filepath, command_str):
         """
         记录命令 (Observer 的 update 方法)
+        Lab2增强: 检查命令是否在排除列表中
         :param filepath: 当前操作的文件路径
         :param command_str: 执行的命令字符串
         """
         if filepath not in self._enabled_files:
             return
+        
+        # Lab2新增: 检查命令是否在排除列表中
+        command_name = command_str.split()[0] if command_str else ""
+        if filepath in self._excluded_commands:
+            if command_name in self._excluded_commands[filepath]:
+                return
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d %H:%M:%S")
         log_entry = f"{timestamp} {command_str}\n"
@@ -103,24 +144,27 @@ class LogOnCommand:
     功能: 启用日志
     """
     def execute(self, command):
+        # Lab2修改: 延迟导入避免循环依赖
+        import WorkSpace as WS
+        
         parts = command.split(' ')
         if len(parts) < 2:
             # 默认对当前活动文件生效
-            if not WorkSpace.WorkSpace.current_workFile_path:
+            if not WS.WorkSpace.current_workFile_path:
                 print("没有打开的文件")
             else:
-                target_file = WorkSpace.WorkSpace.current_workFile_path
+                target_file = WS.WorkSpace.current_workFile_path
                 if not target_file:
                     print("当前文件不存在")
                 else:
-                    WorkSpace.WorkSpace.logger.enable_logging(target_file)
+                    WS.WorkSpace.logger.enable_logging(target_file)
         else:
             # 对指定文件生效
             target_file = parts[1]
             if(target_file not in File.FileList.all_files_path):
                 print("当前文件不存在")
             else:
-                WorkSpace.WorkSpace.logger.enable_logging(target_file)
+                WS.WorkSpace.logger.enable_logging(target_file)
 
 class LogOffCommand:
     """
@@ -128,26 +172,29 @@ class LogOffCommand:
     功能: 关闭日志
     """
     def execute(self, command):
+        # Lab2修改: 延迟导入避免循环依赖
+        import WorkSpace as WS
+        
         parts = command.split(' ')
         if len(parts) < 2:
             # 默认对当前活动文件生效
-            if not WorkSpace.WorkSpace.current_workFile_path:
+            if not WS.WorkSpace.current_workFile_path:
                 print("没有打开的文件")
             else:
                 # 获取当前文件路径
-                target_path = WorkSpace.WorkSpace.current_workFile_path
+                target_path = WS.WorkSpace.current_workFile_path
                 # 检查文件是否在当前工作区列表中
-                if target_path not in WorkSpace.WorkSpace.current_workFile_list:
+                if target_path not in WS.WorkSpace.current_workFile_list:
                     print("当前文件不存在")
                 else:
-                    WorkSpace.WorkSpace.logger.disable_logging(target_path)
+                    WS.WorkSpace.logger.disable_logging(target_path)
         else:
             # 对指定文件生效
             target_file = parts[1]
             if(target_file not in File.FileList.all_files_path):
                 print("当前文件不存在")
             else:
-                WorkSpace.WorkSpace.logger.disable_logging(target_file)
+                WS.WorkSpace.logger.disable_logging(target_file)
             
 class LogShowCommand:
     """
@@ -155,17 +202,20 @@ class LogShowCommand:
     功能: 显示日志内容
     """
     def execute(self, command):
+        # Lab2修改: 延迟导入避免循环依赖
+        import WorkSpace as WS
+        
         parts = command.split(' ')
         if len(parts) < 2:
             # 默认对当前活动文件生效
-            if not WorkSpace.WorkSpace.current_workFile_path:
+            if not WS.WorkSpace.current_workFile_path:
                 print("没有打开的文件")
             else:
-                target_path = WorkSpace.WorkSpace.current_workFile_path
-                if target_path not in WorkSpace.WorkSpace.current_workFile_list:
+                target_path = WS.WorkSpace.current_workFile_path
+                if target_path not in WS.WorkSpace.current_workFile_list:
                     print("当前文件不存在")
                 else:
-                    content = WorkSpace.WorkSpace.logger.show_log(target_path)
+                    content = WS.WorkSpace.logger.show_log(target_path)
                     print(f"--- Log for {target_path} ---")
                     print(content)
                     print("-----------------------------")
@@ -175,7 +225,7 @@ class LogShowCommand:
             if(target_file not in File.FileList.all_files_path):
                 print("当前文件不存在")
             else:
-                content = WorkSpace.WorkSpace.logger.show_log(target_file)
+                content = WS.WorkSpace.logger.show_log(target_file)
                 print(f"--- Log for {target_file} ---")
                 print(content)
                 print("-----------------------------")

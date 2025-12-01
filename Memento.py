@@ -12,16 +12,18 @@ def update(current_workFile_path, current_workFile_list):
             for filePath, fileObj in current_workFile_list.items()
         },
 
-        # 保存所有文件
-        "all_files": [
-            {
-                "fileName": f.fileName,
-                "filePath": f.filePath,
-                "content": f.content,
-                "state": f.state
-            }
-            for f in FileList.all_files.values()
-        ]
+    # 保存所有文件
+    # Lab2修改: 区分TextFile和XmlFile
+    "all_files": [
+        {
+            "fileName": f.fileName,
+            "filePath": f.filePath,
+            "content": f.content if hasattr(f, 'content') else f.serialize(),
+            "state": f.state,
+            "file_type": getattr(f, 'file_type', 'text')
+        }
+        for f in FileList.all_files.values()
+    ]
     }
 
     # 读取原来的状态历史（list）
