@@ -3,6 +3,8 @@ import CommonUtils
 from datetime import datetime
 import Memento
 import Logging
+import Statistics  # Lab2新增
+import os  # Lab2新增
 
 class WorkSpace():
     current_workFile_path = ""
@@ -12,7 +14,10 @@ class WorkSpace():
     recent_files = []
     
     # 集成 Logger 日志记录实例
-    logger = Logging.Logger() 
+    logger = Logging.Logger()
+    
+    # Lab2新增: 集成统计管理器
+    statistics = Statistics.StatisticsManager() 
     
     @classmethod
     #只有在 load close 时才会更新
@@ -20,9 +25,14 @@ class WorkSpace():
         Memento.update(self.current_workFile_path,self.current_workFile_list)
     
     @classmethod
-    def update_current_workFile_path(self,filePath):
+    def update_current_workFile_path(cls,filePath):
+        # Lab2修改: 集成时长统计
+        if cls.current_workFile_path:
+            cls.statistics.stop_timing(cls.current_workFile_path)
         WorkSpace.current_workFile_path = filePath
-        Memento.update(self.current_workFile_path,self.current_workFile_list)
+        if filePath:
+            cls.statistics.start_timing(filePath)
+        Memento.update(cls.current_workFile_path,cls.current_workFile_list)
 
     @classmethod
     def recover(self):
@@ -38,8 +48,13 @@ class WorkSpace():
 
         temp_files = {}
 
+        # Lab2修改: 根据文件类型创建不同的文件对象
         for f in last_state.get("all_files", []):
-            tf = File.TextFile(f["filePath"], content=f["content"])
+            file_type = f.get("file_type", "text")
+            if file_type == 'xml':
+                tf = File.XmlFile(f["filePath"], content=f["content"])
+            else:
+                tf = File.TextFile(f["filePath"], content=f["content"])
             tf.state = f["state"]
 
             temp_files[f["filePath"]] = tf
@@ -60,6 +75,10 @@ class WorkSpace():
         #当前工作文件需要在最近列表最后
         if current_file:
             WorkSpace.recent_files.append(current_file)
+        
+        # Lab2新增: 如果有当前文件，开始计时
+        if WorkSpace.current_workFile_path and WorkSpace.current_workFile_path in WorkSpace.current_workFile_list:
+            WorkSpace.statistics.start_timing(WorkSpace.current_workFile_path)
 
 class LoadCommand():
     def execute(self, command):
@@ -74,10 +93,29 @@ class LoadCommand():
             return 
         curFile = None
         if(filePath not in File.FileList.all_files_path):
-            curFile = CommonUtils.create_newFile(filePath)
+            # Lab2修改: 从文件系统加载时需要创建文件对象
+            import os
+            if os.path.exists(filePath):
+                # 文件存在，从磁盘读取
+                with open(filePath, 'r', encoding='utf-8') as f:
+                    content = [line.rstrip('\n') for line in f.readlines()]
+                # 根据扩展名创建相应类型的文件对象
+                if filePath.endswith('.xml'):
+                    curFile = File.XmlFile(filePath, content=content)
+                else:
+                    curFile = File.TextFile(filePath, content=content)
+                File.FileList.all_files[filePath] = curFile
+                File.FileList.all_files_path.add(filePath)
+            else:
+                # 文件不存在，创建新文件
+                curFile = CommonUtils.create_newFile(filePath)
         else:
             curFile = File.FileList.all_files[filePath]
             print(f"加载文件成功")
+        
+        # Lab2新增: load命令应该重置文件的编辑时长
+        WorkSpace.statistics.reset_timing(filePath)
+        
         WorkSpace.current_workFile_list[filePath]=curFile    
         WorkSpace.update_current_workFile_path(filePath)
         # 更新recent_files列表
@@ -130,8 +168,16 @@ class SaveCommand():
         # 写入文件
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
-                for line in file_to_save.content:
-                    f.write(line + '\n')
+                # Lab2修改: 区分TextFile和XmlFile
+                if hasattr(file_to_save, 'content'):
+                    # TextFile
+                    for line in file_to_save.content:
+                        f.write(line + '\n')
+                else:
+                    # XmlFile
+                    lines = file_to_save.serialize()
+                    for line in lines:
+                        f.write(line + '\n')
             # 更新文件状态
             file_to_save.state = "normal"
             print(f"保存文件 {file_path} 成功")
@@ -160,39 +206,44 @@ class SaveCommand():
                
 
 class InitCommand():
+    # Lab2修改: 支持创建XML文件
     def execute(self, command):
         args = command.split(" ")
-        filePath =""
+        if len(args) < 2:
+            print("参数错误，应为：init <text|xml> [with-log]")
+            return
+        file_type = args[1]
         withLog = False
-        if len(args)==3:
-            if(not CommonUtils.pathCheck(args[1]) or args[2]!="with-log"):
+        if len(args) == 3:
+            if args[2] == "with-log":
+                withLog = True
+            else:
                 print("参数错误")
-                return 
-            filePath = args[1]
-            withLog = True
-        elif len(args)==2:
-            if(not CommonUtils.pathCheck(args[1])):
-                print("参数错误")
-                return 
-            filePath = args[1]
-        else:
+                return
+        elif len(args) > 3:
             print("参数错误")
             return
-        if(filePath in File.FileList.all_files_path):
-            print("文件已存在")
+        if file_type not in ['text', 'xml']:
+            print("参数错误，文件类型必须是 text 或 xml")
             return
-        curFile = CommonUtils.create_newFile(filePath,withLog)
+        import random, string
+        rand_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        filePath = f"untitled_{rand_suffix}.{'txt' if file_type == 'text' else 'xml'}"
+        curFile = CommonUtils.create_newFile(filePath, withLog=withLog, file_type=file_type)
+        if not curFile:
+            return
+        curFile.state = "modified"
         WorkSpace.current_workFile_list[filePath]=curFile
         WorkSpace.update_current_workFile_path(filePath)
         if filePath in WorkSpace.recent_files:
             WorkSpace.recent_files.remove(filePath)
         WorkSpace.recent_files.append(filePath)
-        print("初始化文件成功")
+        print(f"初始化{file_type}文件成功: {filePath}")
         if withLog:
             WorkSpace.logger.enable_logging(filePath)
-            WorkSpace.logger.log_command(filePath, f"init {filePath} with-log")
+            WorkSpace.logger.log_command(filePath, f"init {file_type} with-log")
         else:
-            WorkSpace.logger.log_command(filePath, f"init {filePath}")
+            WorkSpace.logger.log_command(filePath, f"init {file_type}")
 
 class CloseCommand():
     def execute(self, command):
@@ -260,11 +311,22 @@ class EditCommand():
         WorkSpace.logger.log_command(filePath, f"edit {filePath}")
 
 class EditorListCommand():
+    # Lab2修改: 显示编辑时长
     def execute(self, command):
         if(len(command.split(" "))) != 1 :
             print("参数错误，应为：editor-list")
+            return
+        if not WorkSpace.current_workFile_list:
+            print("(没有打开的文件)")
+            return
+        time_decorator = Statistics.TimeDecorator(WorkSpace.statistics)
         for f in WorkSpace.current_workFile_list.values():
-            print(f.filePath)
+            is_active = (f.filePath == WorkSpace.current_workFile_path)
+            is_modified = (f.state == "modified")
+            decorated_name = time_decorator.decorate_with_status(
+                f.filePath, is_active, is_modified
+            )
+            print(decorated_name)
 
 class DirTreeCommand():
     def execute(self, command):
